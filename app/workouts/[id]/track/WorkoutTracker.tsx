@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import Timer from "@/components/Timer"
 
@@ -68,6 +68,11 @@ export default function WorkoutTracker({ workout, sessionId }: { workout: Workou
   const [sessionDuration, setSessionDuration] = useState(0)
   const sessionTimerRef = useRef<NodeJS.Timeout | null>(null)
   const sessionStartTimeRef = useRef<number>(0)
+  // Always-current ref so async saves use the latest state
+  const exerciseStatesRef = useRef(exerciseStates)
+  useEffect(() => {
+    exerciseStatesRef.current = exerciseStates
+  }, [exerciseStates])
 
   useEffect(() => {
     sessionStartTimeRef.current = Date.now()
@@ -128,9 +133,10 @@ export default function WorkoutTracker({ workout, sessionId }: { workout: Workou
     )
   }
 
-  function toggleSetComplete(exerciseId: string, setIndex: number) {
-    setExerciseStates((states) =>
-      states.map((s) =>
+  function toggleSetComplete(exerciseId: string, setIndex: number): ExerciseState[] {
+    let updated: ExerciseState[] = []
+    setExerciseStates((states) => {
+      updated = states.map((s) =>
         s.exerciseId === exerciseId
           ? {
               ...s,
@@ -140,7 +146,9 @@ export default function WorkoutTracker({ workout, sessionId }: { workout: Workou
             }
           : s
       )
-    )
+      return updated
+    })
+    return updated
   }
 
   function setTimerMode(exerciseId: string, mode: ExerciseState["timerMode"]) {
@@ -149,8 +157,9 @@ export default function WorkoutTracker({ workout, sessionId }: { workout: Workou
     )
   }
 
-  async function saveExerciseLog(exerciseId: string, currentStates: ExerciseState[]) {
-    const state = currentStates.find((s) => s.exerciseId === exerciseId)
+  const saveExerciseLog = useCallback(async (exerciseId: string, latestStates?: ExerciseState[]) => {
+    const states = latestStates ?? exerciseStatesRef.current
+    const state = states.find((s) => s.exerciseId === exerciseId)
     if (!state) return
     try {
       const url = state.logId
@@ -171,15 +180,15 @@ export default function WorkoutTracker({ workout, sessionId }: { workout: Workou
     } catch {
       // ignore
     }
-  }
+  }, [sessionId])
 
   async function finishSession() {
     setFinishing(true)
     if (sessionTimerRef.current) clearInterval(sessionTimerRef.current)
 
-    const currentStates = exerciseStates
-    for (const state of currentStates) {
-      await saveExerciseLog(state.exerciseId, currentStates)
+    // Use ref to get latest states at the time of finishing
+    for (const state of exerciseStatesRef.current) {
+      await saveExerciseLog(state.exerciseId)
     }
 
     await fetch(`/api/sessions/${sessionId}`, {
@@ -342,8 +351,9 @@ export default function WorkoutTracker({ workout, sessionId }: { workout: Workou
                         </div>
                         <button
                           onClick={() => {
-                            toggleSetComplete(we.exerciseId, setIndex)
-                            saveExerciseLog(we.exerciseId, exerciseStates)
+                            // Compute updated states synchronously, pass to save
+                            const updated = toggleSetComplete(we.exerciseId, setIndex)
+                            saveExerciseLog(we.exerciseId, updated)
                           }}
                           className={`w-full py-2 text-xs tracking-widest border transition-colors ${
                             set.completed
