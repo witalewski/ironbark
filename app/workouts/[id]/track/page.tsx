@@ -20,5 +20,9 @@ export default async function TrackWorkoutPage({ params }: { params: Promise<{ i
 
   if (!workout) notFound()
 
-  return <WorkoutTracker workout={workout} />
+  const workoutSession = await prisma.workoutSession.create({
+    data: { userId: session.user.id, workoutId: id },
+  })
+
+  return <WorkoutTracker workout={workout} sessionId={workoutSession.id} />
 }

@@ -14,6 +14,11 @@ export default function Timer({ mode, emomInterval, onEmomIntervalChange }: Time
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const startTimeRef = useRef<number>(0)
   const pausedElapsedRef = useRef<number>(0)
+  const emomIntervalRef = useRef(emomInterval)
+
+  useEffect(() => {
+    emomIntervalRef.current = emomInterval
+  }, [emomInterval])
 
   const stop = useCallback(() => {
     if (intervalRef.current) {
@@ -27,18 +32,14 @@ export default function Timer({ mode, emomInterval, onEmomIntervalChange }: Time
     stop()
     setElapsed(0)
     pausedElapsedRef.current = 0
-    if (mode === "emom") setCountdown(emomInterval)
-  }, [stop, mode, emomInterval])
+    if (mode === "emom") setCountdown(emomIntervalRef.current)
+  }, [stop, mode])
 
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current)
     }
   }, [])
-
-  useEffect(() => {
-    reset() // eslint-disable-line react-hooks/set-state-in-effect
-  }, [mode]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function start() {
     if (running) return

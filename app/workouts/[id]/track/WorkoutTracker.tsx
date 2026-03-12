@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useCallback, useRef } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Timer from "@/components/Timer"
 
@@ -51,9 +51,8 @@ function createDefaultSet(trackingTypes: string[]): SetEntry {
   }
 }
 
-export default function WorkoutTracker({ workout }: { workout: Workout }) {
+export default function WorkoutTracker({ workout, sessionId }: { workout: Workout; sessionId: string }) {
   const router = useRouter()
-  const [sessionId, setSessionId] = useState<string | null>(null)
   const [exerciseStates, setExerciseStates] = useState<ExerciseState[]>(
     workout.workoutExercises.map((we) => ({
       exerciseId: we.exerciseId,
@@ -70,31 +69,15 @@ export default function WorkoutTracker({ workout }: { workout: Workout }) {
   const sessionTimerRef = useRef<NodeJS.Timeout | null>(null)
   const sessionStartTimeRef = useRef<number>(0)
 
-  const startSession = useCallback(async () => {
-    try {
-      const res = await fetch("/api/sessions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workoutId: workout.id }),
-      })
-      if (!res.ok) return
-      const session = await res.json()
-      setSessionId(session.id)
-      sessionStartTimeRef.current = Date.now()
-      sessionTimerRef.current = setInterval(() => {
-        setSessionDuration(Math.floor((Date.now() - sessionStartTimeRef.current) / 1000))
-      }, 1000)
-    } catch {
-      // ignore
-    }
-  }, [workout.id])
-
   useEffect(() => {
-    startSession() // eslint-disable-line react-hooks/set-state-in-effect
+    sessionStartTimeRef.current = Date.now()
+    sessionTimerRef.current = setInterval(() => {
+      setSessionDuration(Math.floor((Date.now() - sessionStartTimeRef.current) / 1000))
+    }, 1000)
     return () => {
       if (sessionTimerRef.current) clearInterval(sessionTimerRef.current)
     }
-  }, [startSession])
+  }, [])
 
   function formatDuration(seconds: number) {
     const h = Math.floor(seconds / 3600)
@@ -167,7 +150,6 @@ export default function WorkoutTracker({ workout }: { workout: Workout }) {
   }
 
   async function saveExerciseLog(exerciseId: string, currentStates: ExerciseState[]) {
-    if (!sessionId) return
     const state = currentStates.find((s) => s.exerciseId === exerciseId)
     if (!state) return
     try {
@@ -200,13 +182,11 @@ export default function WorkoutTracker({ workout }: { workout: Workout }) {
       await saveExerciseLog(state.exerciseId, currentStates)
     }
 
-    if (sessionId) {
-      await fetch(`/api/sessions/${sessionId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ completedAt: new Date().toISOString() }),
-      })
-    }
+    await fetch(`/api/sessions/${sessionId}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ completedAt: new Date().toISOString() }),
+    })
 
     router.push("/sessions")
   }
@@ -396,6 +376,7 @@ export default function WorkoutTracker({ workout }: { workout: Workout }) {
                     </div>
                     {state.timerMode !== "off" && (
                       <Timer
+                        key={state.timerMode}
                         mode={state.timerMode}
                         emomInterval={state.emomInterval}
                         onEmomIntervalChange={(v) =>
