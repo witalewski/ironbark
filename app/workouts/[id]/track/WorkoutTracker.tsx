@@ -51,8 +51,7 @@ function createDefaultSet(trackingTypes: string[]): SetEntry {
   }
 }
 
-export default function WorkoutTracker({ workout, userId }: { workout: Workout; userId: string }) {
-  void userId
+export default function WorkoutTracker({ workout }: { workout: Workout }) {
   const router = useRouter()
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [exerciseStates, setExerciseStates] = useState<ExerciseState[]>(

@@ -20,5 +20,5 @@ export default async function TrackWorkoutPage({ params }: { params: Promise<{ i
 
   if (!workout) notFound()
 
-  return <WorkoutTracker workout={workout} userId={session.user.id} />
+  return <WorkoutTracker workout={workout} />
 }
